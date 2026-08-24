@@ -20,10 +20,17 @@ function App() {
   const [, setUpdateTick] = useState(0);
   
   const [selectedNodeValues, setSelectedNodeValues] = useState<number[]>([]);
-  
   const [inputValue, setInputValue] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
   const [canvasWidth, setCanvasWidth] = useState(800);
+
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [toastId, setToastId] = useState(0);
+
+  const showToast = (msg: string) => {
+    setToastMessage(`> ${msg}`);
+    setToastId(prev => prev + 1);
+  };
 
   const saveState = () => {
     setHistory(prevHistory => {
@@ -44,7 +51,9 @@ function App() {
       const state = history[newIndex];
       bst.root = state.bstRoot ? state.bstRoot.clone() : null;
       avl.root = state.avlRoot ? state.avlRoot.clone() : null;
+      setSelectedNodeValues([]);
       setUpdateTick(prev => prev + 1);
+      showToast('Undo');
     }
   };
 
@@ -55,7 +64,9 @@ function App() {
       const state = history[newIndex];
       bst.root = state.bstRoot ? state.bstRoot.clone() : null;
       avl.root = state.avlRoot ? state.avlRoot.clone() : null;
+      setSelectedNodeValues([]);
       setUpdateTick(prev => prev + 1);
+      showToast('Redo');
     }
   };
 
@@ -88,11 +99,12 @@ function App() {
     saveState();
     setInputValue('');
     setUpdateTick(prev => prev + 1);
+    showToast(`Inserted ${val}`);
   };
 
   const handleDelete = () => {
-    const val = parseInt(inputValue, 10);
-    if (isNaN(val)) return;
+    if (selectedNodeValues.length !== 1) return;
+    const val = selectedNodeValues[0];
 
     if (treeType === 'BST') {
       bst.delete(val);
@@ -100,14 +112,14 @@ function App() {
       avl.delete(val);
     }
     
+    setSelectedNodeValues([]);
     saveState();
-    setInputValue('');
     setUpdateTick(prev => prev + 1);
+    showToast(`Deleted ${val}`);
   };
   
   const handleRandomize = () => {
     const vals = Array.from({length: 7}, () => Math.floor(Math.random() * 100));
-    // Clear trees first (re-instantiating would lose identity, but here we just reset root)
     if (treeType === 'BST') {
       bst.root = null;
       vals.forEach(v => bst.insert(v));
@@ -115,8 +127,10 @@ function App() {
       avl.root = null;
       vals.forEach(v => avl.insert(v));
     }
+    setSelectedNodeValues([]);
     saveState();
     setUpdateTick(prev => prev + 1);
+    showToast('Generated random tree');
   };
   
   const handleNodeClick = (value: number) => {
@@ -137,6 +151,7 @@ function App() {
     setSelectedNodeValues([]);
     saveState();
     setUpdateTick(prev => prev + 1);
+    showToast('Cleared canvas');
   };
   
   const handleAdvancedRotate = (type: 'LL' | 'RR' | 'LR' | 'RL') => {
@@ -147,43 +162,47 @@ function App() {
       setSelectedNodeValues([]); // Auto-deselect on success
       saveState();
       setUpdateTick(prev => prev + 1);
+      showToast(`Rotated (${type})`);
     }
   };
 
   const currentRoot = treeType === 'BST' ? bst.root : avl.root;
   const layout = computeTreeLayout(currentRoot, canvasWidth, 80);
-
-  // Dynamic height based on deepest node
   const canvasHeight = Math.max(600, (layout.nodes.length > 0 ? Math.max(...layout.nodes.map(n => n.y)) : 0) + 120);
+
+  const chainType = treeType === 'BST' && selectedNodeValues.length === 3 ? bst.getChainType(selectedNodeValues) : null;
 
   return (
     <div className="app-container">
       <div className="sidebar">
         <div className="header">
-          <h1>TreeWise</h1>
-          <p>Professional Data Structure Visualization</p>
-          <div className="history-controls" style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+          <div className="logo-row">
+            <h1>TreeWise</h1>
+            <div className="logo-dot"></div>
+          </div>
+          <p className="tagline">Binary trees, drawn the way you'd reason about them on a whiteboard.</p>
+          <div className="history-controls" style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
             <button 
               className="btn btn-secondary" 
               onClick={handleUndo} 
               disabled={historyIndex <= 0}
-              style={{ flex: 1, padding: '6px 12px', fontSize: '14px', opacity: historyIndex <= 0 ? 0.5 : 1, cursor: historyIndex <= 0 ? 'not-allowed' : 'pointer' }}
+              style={{ flex: 1 }}
             >
-              ↶ Undo
+              ↺
             </button>
             <button 
               className="btn btn-secondary" 
               onClick={handleRedo} 
               disabled={historyIndex >= history.length - 1}
-              style={{ flex: 1, padding: '6px 12px', fontSize: '14px', opacity: historyIndex >= history.length - 1 ? 0.5 : 1, cursor: historyIndex >= history.length - 1 ? 'not-allowed' : 'pointer' }}
+              style={{ flex: 1 }}
             >
-              Redo ↷
+              ↻
             </button>
           </div>
         </div>
 
         <div className="controls-group">
-          <label>Tree Type</label>
+          <div className="section-header">TREE TYPE</div>
           <div className="tree-selector">
             <button 
               className={treeType === 'BST' ? 'active' : ''} 
@@ -198,10 +217,15 @@ function App() {
               AVL (Balanced)
             </button>
           </div>
+          <div className="big-o-caption">
+            {treeType === 'BST' 
+              ? 'avg O(log n) lookup · worst O(n) if it grows lopsided' 
+              : 'guaranteed O(log n) height · rebalances on every write'}
+          </div>
         </div>
 
         <div className="controls-group">
-          <label>Operations</label>
+          <div className="section-header">OPERATIONS</div>
           <form className="input-row" onSubmit={handleInsert}>
             <input 
               type="number" 
@@ -211,45 +235,68 @@ function App() {
             />
             <button type="submit" className="btn">Insert</button>
           </form>
-          <button className="btn btn-secondary" onClick={handleDelete} style={{ color: 'var(--danger-color)', borderColor: 'var(--danger-color)' }}>
-            Delete Node
+          <button className="btn btn-danger" onClick={handleDelete} disabled={selectedNodeValues.length !== 1}>
+            Delete Selected Node
           </button>
         </div>
         
         {treeType === 'BST' && (
           <div className="controls-group">
-            <label>Selected Nodes ({selectedNodeValues.length}/3)</label>
-            {selectedNodeValues.length > 0 && (
-              <p style={{ fontSize: '13px', color: 'var(--primary-color)', marginBottom: '8px' }}>
-                {selectedNodeValues.join(' -> ')}
+            <div className="section-header">SELECTED NODES</div>
+            
+            {selectedNodeValues.length === 0 && (
+              <p style={{ fontFamily: 'IBM Plex Sans', fontSize: '13px', color: 'var(--text-muted)' }}>
+                Pick three nodes in a straight line — grandparent, parent, child — to rotate them.
               </p>
             )}
-            
-            {selectedNodeValues.length === 3 ? (
-              bst.isValidChain(selectedNodeValues) ? (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                  <button className="btn btn-secondary" onClick={() => handleAdvancedRotate('LL')}>LL Rotation</button>
-                  <button className="btn btn-secondary" onClick={() => handleAdvancedRotate('RR')}>RR Rotation</button>
-                  <button className="btn btn-secondary" onClick={() => handleAdvancedRotate('LR')}>LR Rotation</button>
-                  <button className="btn btn-secondary" onClick={() => handleAdvancedRotate('RL')}>RL Rotation</button>
+
+            {(selectedNodeValues.length === 1 || selectedNodeValues.length === 2) && (
+              <p style={{ fontFamily: 'IBM Plex Sans', fontSize: '13px', color: 'var(--text-main)' }}>
+                {selectedNodeValues.join(', ')} ({3 - selectedNodeValues.length} more needed)
+              </p>
+            )}
+
+            {selectedNodeValues.length === 3 && (
+              chainType ? (
+                <div style={{ fontFamily: 'IBM Plex Mono', fontWeight: 600, fontSize: '14px', color: 'var(--primary-color)', marginBottom: '8px' }}>
+                  {selectedNodeValues.join(' -> ')}
                 </div>
               ) : (
-                <p style={{ fontSize: '13px', color: 'var(--danger-color)' }}>Invalid chain. Select a parent, child, and grandchild connected together.</p>
+                <p style={{ fontFamily: 'IBM Plex Sans', fontSize: '13px', color: 'var(--danger-color)' }}>
+                  Nodes must form a vertical straight line to rotate.
+                </p>
               )
-            ) : (
-              <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Select exactly 3 nodes forming a vertical chain to rotate them.</p>
             )}
+            
+            <div className="rotation-grid">
+              {(['LL', 'RR', 'LR', 'RL'] as const).map(type => (
+                <button 
+                  key={type}
+                  className={`rotation-btn ${chainType === type ? 'active' : ''}`} 
+                  onClick={() => handleAdvancedRotate(type)}
+                  disabled={chainType !== type}
+                >
+                  {type}
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
         <div className="controls-group" style={{ marginTop: 'auto' }}>
-           <button className="btn btn-secondary" onClick={handleRandomize} style={{ marginBottom: '8px' }}>
+           <button className="btn btn-secondary" onClick={handleRandomize} style={{ marginBottom: '8px', width: '100%' }}>
              Generate Random Tree
            </button>
-           <button className="btn btn-secondary" onClick={handleClear}>
+           <button className="btn btn-secondary" onClick={handleClear} style={{ width: '100%' }}>
              Clear Canvas
            </button>
         </div>
+
+        {toastMessage && (
+          <div className="toast" key={toastId}>
+            {toastMessage}
+          </div>
+        )}
       </div>
 
       <div className="canvas-container" ref={containerRef}>
@@ -257,7 +304,7 @@ function App() {
           layout={layout} 
           width={canvasWidth} 
           height={canvasHeight}
-          onNodeClick={treeType === 'BST' ? handleNodeClick : undefined}
+          onNodeClick={handleNodeClick}
           selectedNodeValues={selectedNodeValues}
         />
       </div>

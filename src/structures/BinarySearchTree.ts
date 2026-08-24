@@ -138,6 +138,37 @@ export class BinarySearchTree<T> {
     return (Z.left === Y || Z.right === Y) && (Y.left === X || Y.right === X);
   }
 
+  public getChainType(values: T[]): 'LL' | 'RR' | 'LR' | 'RL' | null {
+    if (!this.isValidChain(values)) return null;
+
+    const nodesInfo: { node: TreeNode<T>, depth: number }[] = [];
+    for (const val of values) {
+      let current = this.root;
+      let depth = 0;
+      while (current) {
+        if (val === current.value) {
+          nodesInfo.push({ node: current, depth });
+          break;
+        }
+        depth++;
+        if (val < current.value) current = current.left;
+        else current = current.right;
+      }
+    }
+    
+    nodesInfo.sort((a, b) => a.depth - b.depth);
+    const Z = nodesInfo[0].node;
+    const Y = nodesInfo[1].node;
+    const X = nodesInfo[2].node;
+
+    if (Z.left === Y && Y.left === X) return 'LL';
+    if (Z.right === Y && Y.right === X) return 'RR';
+    if (Z.left === Y && Y.right === X) return 'LR';
+    if (Z.right === Y && Y.left === X) return 'RL';
+
+    return null;
+  }
+
   public performAdvancedRotation(values: T[], type: 'LL' | 'RR' | 'LR' | 'RL'): boolean {
     if (!this.isValidChain(values)) return false;
 

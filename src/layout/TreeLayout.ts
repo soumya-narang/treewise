@@ -7,6 +7,7 @@ export interface LayoutNode<T> {
   y: number;
   leftId: string | null;
   rightId: string | null;
+  path: string;
 }
 
 export interface TreeEdgeData {
@@ -41,7 +42,8 @@ export function computeTreeLayout<T>(
     node: TreeNode<T>,
     depth: number,
     minX: number,
-    maxX: number
+    maxX: number,
+    path: string
   ) => {
     const x = (minX + maxX) / 2;
     const y = depth * levelHeight + 60; // 60px top padding
@@ -52,11 +54,12 @@ export function computeTreeLayout<T>(
       x,
       y,
       leftId: node.left?.id || null,
-      rightId: node.right?.id || null
+      rightId: node.right?.id || null,
+      path
     });
 
     if (node.left) {
-      assignCoordinates(node.left, depth + 1, minX, x);
+      assignCoordinates(node.left, depth + 1, minX, x, path === 'root' ? 'L' : `${path}·L`);
       // Let's compute edge targets based on where we think the children will end up
       const targetX = (minX + x) / 2;
       const targetY = (depth + 1) * levelHeight + 60;
@@ -70,7 +73,7 @@ export function computeTreeLayout<T>(
     }
 
     if (node.right) {
-      assignCoordinates(node.right, depth + 1, x, maxX);
+      assignCoordinates(node.right, depth + 1, x, maxX, path === 'root' ? 'R' : `${path}·R`);
       const targetX = (x + maxX) / 2;
       const targetY = (depth + 1) * levelHeight + 60;
       edges.push({
@@ -83,7 +86,7 @@ export function computeTreeLayout<T>(
     }
   };
 
-  assignCoordinates(root, 0, paddingX, canvasWidth - paddingX);
+  assignCoordinates(root, 0, paddingX, canvasWidth - paddingX, 'root');
 
   return { nodes, edges };
 }
