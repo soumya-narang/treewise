@@ -45,6 +45,10 @@ export function TreeCanvas<T>({ layout, width, height, onNodeClick, selectedNode
         {layout.nodes.map((node) => {
           const selIndex = selectedNodeValues.indexOf(node.value);
           const isSelected = selIndex !== -1;
+          const fillColor = node.color === 'RED' ? 'var(--danger-color)'
+            : node.color === 'BLACK' ? 'var(--primary-color)'
+            : 'var(--node-bg)';
+          const textColor = node.color ? 'var(--panel-bg)' : 'var(--node-text)';
 
           return (
             <g
@@ -60,15 +64,15 @@ export function TreeCanvas<T>({ layout, width, height, onNodeClick, selectedNode
             >
               <circle
                 r="24"
-                fill="var(--node-bg)"
+                fill={fillColor}
                 stroke={isSelected ? 'var(--accent-color)' : 'var(--node-border)'}
                 strokeWidth={isSelected ? '2.6' : '1.6'}
-                style={{ transition: 'stroke 0.2s, stroke-width 0.2s' }}
+                style={{ transition: 'stroke 0.2s, stroke-width 0.2s, fill 0.3s ease' }}
               />
               <text
                 textAnchor="middle"
                 alignmentBaseline="central"
-                fill="var(--node-text)"
+                fill={textColor}
                 fontSize="16"
                 fontWeight="700"
                 fontFamily="'IBM Plex Mono', monospace"

@@ -3,10 +3,11 @@ import './App.css';
 import { BinarySearchTree } from './structures/BinarySearchTree';
 import { AVLTree } from './structures/AVLTree';
 import { HeapTree } from './structures/HeapTree';
+import { RedBlackTree } from './structures/RedBlackTree';
 import { computeTreeLayout } from './layout/TreeLayout';
 import { TreeCanvas } from './components/TreeCanvas';
 
-type TreeType = 'BST' | 'AVL' | 'MINHEAP' | 'MAXHEAP';
+type TreeType = 'BST' | 'AVL' | 'MINHEAP' | 'MAXHEAP' | 'RBT';
 
 function App() {
   const [treeType, setTreeType] = useState<TreeType>('BST');
@@ -14,6 +15,7 @@ function App() {
   const [avl] = useState(new AVLTree<number>());
   const [minHeap] = useState(new HeapTree<number>('MIN'));
   const [maxHeap] = useState(new HeapTree<number>('MAX'));
+  const [rbt] = useState(new RedBlackTree<number>());
   
   // History state for undo/redo
   const [history, setHistory] = useState<{
@@ -21,7 +23,8 @@ function App() {
     avlRoot: typeof avl.root;
     minHeapRoot: typeof minHeap.root;
     maxHeapRoot: typeof maxHeap.root;
-  }[]>([{ bstRoot: null, avlRoot: null, minHeapRoot: null, maxHeapRoot: null }]);
+    rbtRoot: typeof rbt.root;
+  }[]>([{ bstRoot: null, avlRoot: null, minHeapRoot: null, maxHeapRoot: null, rbtRoot: null }]);
   const [historyIndex, setHistoryIndex] = useState(0);
 
   // We use a counter just to force re-renders when the mutable tree changes
@@ -48,6 +51,7 @@ function App() {
         avlRoot: avl.root ? avl.root.clone() : null,
         minHeapRoot: minHeap.root ? minHeap.root.clone() : null,
         maxHeapRoot: maxHeap.root ? maxHeap.root.clone() : null,
+        rbtRoot: rbt.root ? rbt.root.clone() : null,
       });
       setHistoryIndex(newHistory.length - 1);
       return newHistory;
@@ -63,6 +67,7 @@ function App() {
       avl.root = state.avlRoot ? state.avlRoot.clone() : null;
       minHeap.root = state.minHeapRoot ? state.minHeapRoot.clone() : null;
       maxHeap.root = state.maxHeapRoot ? state.maxHeapRoot.clone() : null;
+      rbt.root = state.rbtRoot ? state.rbtRoot.clone() : null;
       setSelectedNodeValues([]);
       setUpdateTick(prev => prev + 1);
       showToast('Undo');
@@ -78,6 +83,7 @@ function App() {
       avl.root = state.avlRoot ? state.avlRoot.clone() : null;
       minHeap.root = state.minHeapRoot ? state.minHeapRoot.clone() : null;
       maxHeap.root = state.maxHeapRoot ? state.maxHeapRoot.clone() : null;
+      rbt.root = state.rbtRoot ? state.rbtRoot.clone() : null;
       setSelectedNodeValues([]);
       setUpdateTick(prev => prev + 1);
       showToast('Redo');
@@ -110,6 +116,7 @@ function App() {
       case 'AVL': inserted = avl.insert(val); break;
       case 'MINHEAP': inserted = minHeap.insert(val); break;
       case 'MAXHEAP': inserted = maxHeap.insert(val); break;
+      case 'RBT': inserted = rbt.insert(val); break;
     }
     if (!inserted) {
       showToast(`${val} already exists`);
@@ -131,6 +138,7 @@ function App() {
       case 'AVL': avl.delete(val); break;
       case 'MINHEAP': minHeap.delete(val); break;
       case 'MAXHEAP': maxHeap.delete(val); break;
+      case 'RBT': rbt.delete(val); break;
     }
     
     setSelectedNodeValues([]);
@@ -158,6 +166,10 @@ function App() {
         maxHeap.root = null;
         vals.forEach(v => maxHeap.insert(v));
         break;
+      case 'RBT':
+        rbt.root = null;
+        vals.forEach(v => rbt.insert(v));
+        break;
     }
     setSelectedNodeValues([]);
     saveState();
@@ -183,6 +195,7 @@ function App() {
       case 'AVL': avl.root = null; break;
       case 'MINHEAP': minHeap.root = null; break;
       case 'MAXHEAP': maxHeap.root = null; break;
+      case 'RBT': rbt.root = null; break;
     }
     setSelectedNodeValues([]);
     saveState();
@@ -206,7 +219,8 @@ function App() {
     treeType === 'BST' ? bst.root :
     treeType === 'AVL' ? avl.root :
     treeType === 'MINHEAP' ? minHeap.root :
-    maxHeap.root;
+    treeType === 'MAXHEAP' ? maxHeap.root :
+    rbt.root;
   const layout = computeTreeLayout(currentRoot, canvasWidth, 80);
   const canvasHeight = Math.max(600, (layout.nodes.length > 0 ? Math.max(...layout.nodes.map(n => n.y)) : 0) + 120);
 
@@ -268,12 +282,19 @@ function App() {
             >
               Max Heap
             </button>
+            <button 
+              className={treeType === 'RBT' ? 'active' : ''} 
+              onClick={() => { setTreeType('RBT'); setSelectedNodeValues([]); setUpdateTick(t=>t+1); }}
+            >
+              Red-Black
+            </button>
           </div>
           <div className="big-o-caption">
             {treeType === 'BST' && 'avg O(log n) lookup · worst O(n) if it grows lopsided'}
             {treeType === 'AVL' && 'guaranteed O(log n) height · rebalances on every write'}
             {treeType === 'MINHEAP' && 'complete tree · root is always the minimum · O(log n) insert/delete'}
             {treeType === 'MAXHEAP' && 'complete tree · root is always the maximum · O(log n) insert/delete'}
+            {treeType === 'RBT' && 'guaranteed O(log n) height · balances via node color, not strict height'}
           </div>
         </div>
 

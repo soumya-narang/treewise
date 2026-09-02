@@ -8,6 +8,7 @@ export interface LayoutNode<T> {
   leftId: string | null;
   rightId: string | null;
   path: string;
+  color: 'RED' | 'BLACK' | null;
 }
 
 export interface TreeEdgeData {
@@ -55,7 +56,8 @@ export function computeTreeLayout<T>(
       y,
       leftId: node.left?.id || null,
       rightId: node.right?.id || null,
-      path
+      path,
+      color: node.color
     });
 
     if (node.left) {

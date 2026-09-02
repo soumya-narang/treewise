@@ -164,6 +164,11 @@
   border-bottom: none;
 }
 
+.tree-selector button:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+  border-right: none;
+}
+
 .tree-selector button.active {
   background-color: var(--primary-color);
   color: var(--panel-bg);
