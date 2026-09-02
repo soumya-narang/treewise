@@ -19,13 +19,13 @@ function App() {
   const [minHeap] = useState(new HeapTree<number>('MIN'));
   const [maxHeap] = useState(new HeapTree<number>('MAX'));
   const [rbt] = useState(new RedBlackTree<number>());
-  const [btree] = useState(new BTree<number>(2));
+  const [btree] = useState(new BTree<number>(3));
   // A B-Tree's order is a structural choice fixed before any insertion -
   // changing it later means rebuilding the tree from scratch - so the UI
   // requires it to be set explicitly at least once before Insert/Randomize
   // are enabled for this tree type.
   const [btreeOrderConfirmed, setBtreeOrderConfirmed] = useState(false);
-  const [btreeOrderInput, setBtreeOrderInput] = useState('2');
+  const [btreeOrderInput, setBtreeOrderInput] = useState('3');
   
   // History state for undo/redo
   const [history, setHistory] = useState<{
@@ -239,8 +239,8 @@ function App() {
   const handleSetBtreeOrder = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     const order = parseInt(btreeOrderInput, 10);
-    if (isNaN(order) || order < 2) {
-      showToast('Order must be a whole number ≥ 2');
+    if (isNaN(order) || order < 3) {
+      showToast('Order must be a whole number ≥ 3');
       return;
     }
     btree.order = order;
@@ -353,7 +353,7 @@ function App() {
             {treeType === 'MINHEAP' && 'complete tree · root is always the minimum · O(log n) insert/delete'}
             {treeType === 'MAXHEAP' && 'complete tree · root is always the maximum · O(log n) insert/delete'}
             {treeType === 'RBT' && 'guaranteed O(log n) height · balances via node color, not strict height'}
-            {treeType === 'BTREE' && `order t = ${btree.order} · each node holds ${btree.order - 1}-${2 * btree.order - 1} keys · O(log n) height`}
+            {treeType === 'BTREE' && `order m = ${btree.order} · each node holds ${Math.ceil(btree.order / 2) - 1}-${btree.order - 1} keys · O(log n) height`}
           </div>
         </div>
 
@@ -363,13 +363,13 @@ function App() {
             {!btreeOrderConfirmed ? (
               <>
                 <p style={{ fontFamily: 'IBM Plex Sans', fontSize: '13px', color: 'var(--text-main)' }}>
-                  Required before inserting: pick the minimum degree (t). Every node will hold t-1 to 2t-1 keys.
+                  Required before inserting: pick the order (m) — the max number of children per node. Every node will hold up to m-1 keys.
                 </p>
                 <form className="input-row" onSubmit={handleSetBtreeOrder}>
                   <input 
                     type="number" 
-                    min={2}
-                    placeholder="t ≥ 2"
+                    min={3}
+                    placeholder="m ≥ 3"
                     value={btreeOrderInput}
                     onChange={e => setBtreeOrderInput(e.target.value)}
                   />
@@ -379,12 +379,12 @@ function App() {
             ) : btree.root === null ? (
               <>
                 <p style={{ fontFamily: 'IBM Plex Mono', fontSize: '13px', color: 'var(--primary-color)', fontWeight: 600 }}>
-                  t = {btree.order} (max {2 * btree.order - 1} keys/node)
+                  m = {btree.order} (max {btree.order - 1} keys/node, max {btree.order} children)
                 </p>
                 <form className="input-row" onSubmit={handleSetBtreeOrder}>
                   <input 
                     type="number" 
-                    min={2}
+                    min={3}
                     placeholder="New order..." 
                     value={btreeOrderInput}
                     onChange={e => setBtreeOrderInput(e.target.value)}
@@ -395,7 +395,7 @@ function App() {
             ) : (
               <>
                 <p style={{ fontFamily: 'IBM Plex Mono', fontSize: '13px', color: 'var(--primary-color)', fontWeight: 600 }}>
-                  t = {btree.order} (max {2 * btree.order - 1} keys/node)
+                  m = {btree.order} (max {btree.order - 1} keys/node, max {btree.order} children)
                 </p>
                 <p style={{ fontFamily: 'IBM Plex Sans', fontSize: '12px', color: 'var(--text-muted)' }}>
                   Clear the canvas to pick a different order.

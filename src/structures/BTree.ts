@@ -1,33 +1,44 @@
 import { BTreeNode } from './BTreeNode';
 
 /**
- * A standard CLRS-style B-tree of minimum degree `t` (default 2, i.e. a
- * 2-3-4 tree: every node holds 1-3 keys and, if internal, 2-4 children).
- *   - insert: single-pass top-down insertion that proactively splits any
- *     full node (2t-1 keys) it passes through, so the recursion never has
- *     to propagate a split back up.
- *   - delete: the textbook recursive procedure - deleting from a leaf is a
- *     simple removal, deleting from an internal node swaps in the
- *     predecessor/successor key, and any child about to be recursed into
- *     that only has the minimum (t-1) keys is first topped up by
- *     borrowing from a sibling or merging with one, so the recursion
- *     never descends into a node it could underflow.
+ * A B-tree of order `m`: every node has at most `m` children, so at most
+ * m-1 keys, and (except the root) at least ceil(m/2) children, so at
+ * least ceil(m/2)-1 keys. This is the "order" most DSA courses teach -
+ * not CLRS's "minimum degree t" (max keys 2t-1); the two conventions only
+ * coincide when m is even, where t = m/2.
+ *   - insert: ordinary recursive descent to a leaf, insert there, then on
+ *     the way back up split any node that now holds m keys (one over the
+ *     m-1 limit), promoting its middle key into the parent. If the root
+ *     itself overflows, a new root is created above it.
+ *   - delete: ordinary recursive descent to find the value (swapping an
+ *     internal match down to its predecessor leaf first), remove it from
+ *     the leaf it actually lives at, then on the way back up top off any
+ *     child that dropped below the minimum by borrowing from a sibling or
+ *     merging with one. Fixing underflow bottom-up (only after the real
+ *     removal already happened) rather than top-down (pre-emptively,
+ *     before descending) is what keeps a merge from ever overflowing: it
+ *     always combines an already-short child with a normal one, which
+ *     fits within the m-1 cap for every order, even or odd.
  */
 export class BTree<T> {
   root: BTreeNode<T> | null = null;
-  // The minimum degree (commonly called the tree's "order"). Public and
-  // mutable because it's a fixed choice made before any insertion - the UI
-  // sets it once up front, and changing it always goes hand in hand with
-  // clearing `root`, since an existing tree's shape is only valid under the
-  // order it was built with.
+  // The tree's order (m): the maximum number of children per node. Public
+  // and mutable because it's a fixed choice made before any insertion -
+  // the UI sets it once up front, and changing it always goes hand in
+  // hand with clearing `root`, since an existing tree's shape is only
+  // valid under the order it was built with.
   order: number;
 
-  constructor(order: number = 2) {
+  constructor(order: number = 3) {
     this.order = order;
   }
 
   private maxKeys(): number {
-    return 2 * this.order - 1;
+    return this.order - 1;
+  }
+
+  private minKeys(): number {
+    return Math.ceil(this.order / 2) - 1;
   }
 
   contains(value: T): boolean {
@@ -55,7 +66,9 @@ export class BTree<T> {
       return true;
     }
 
-    if (this.root.keys.length === this.maxKeys()) {
+    this.insertRec(this.root, value);
+
+    if (this.root.keys.length > this.maxKeys()) {
       const newRoot = new BTreeNode<T>();
       newRoot.leaf = false;
       newRoot.children = [this.root];
@@ -63,52 +76,52 @@ export class BTree<T> {
       this.root = newRoot;
     }
 
-    this.insertNonFull(this.root, value);
     return true;
   }
 
+  private insertRec(node: BTreeNode<T>, value: T): void {
+    if (node.leaf) {
+      let i = node.keys.length - 1;
+      while (i >= 0 && value < node.keys[i]) i--;
+      node.keys.splice(i + 1, 0, value);
+      return;
+    }
+
+    let i = node.keys.length - 1;
+    while (i >= 0 && value < node.keys[i]) i--;
+    i++;
+
+    this.insertRec(node.children[i], value);
+
+    if (node.children[i].keys.length > this.maxKeys()) {
+      this.splitChild(node, i);
+    }
+  }
+
+  // Splits `parent.children[index]`, which holds exactly one more key
+  // than allowed, promoting its middle key up into `parent`.
   private splitChild(parent: BTreeNode<T>, index: number): void {
-    const t = this.order;
     const fullChild = parent.children[index];
+    const midIndex = Math.floor(fullChild.keys.length / 2);
     const newChild = new BTreeNode<T>();
     newChild.leaf = fullChild.leaf;
 
-    const midKey = fullChild.keys[t - 1];
-    newChild.keys = fullChild.keys.slice(t);
-    fullChild.keys = fullChild.keys.slice(0, t - 1);
+    const midKey = fullChild.keys[midIndex];
+    newChild.keys = fullChild.keys.slice(midIndex + 1);
+    fullChild.keys = fullChild.keys.slice(0, midIndex);
 
     if (!fullChild.leaf) {
-      newChild.children = fullChild.children.slice(t);
-      fullChild.children = fullChild.children.slice(0, t);
+      newChild.children = fullChild.children.slice(midIndex + 1);
+      fullChild.children = fullChild.children.slice(0, midIndex + 1);
     }
 
     parent.children.splice(index + 1, 0, newChild);
     parent.keys.splice(index, 0, midKey);
   }
 
-  private insertNonFull(node: BTreeNode<T>, value: T): void {
-    let i = node.keys.length - 1;
-
-    if (node.leaf) {
-      while (i >= 0 && value < node.keys[i]) i--;
-      node.keys.splice(i + 1, 0, value);
-      return;
-    }
-
-    while (i >= 0 && value < node.keys[i]) i--;
-    i++;
-
-    if (node.children[i].keys.length === this.maxKeys()) {
-      this.splitChild(node, i);
-      if (value > node.keys[i]) i++;
-    }
-
-    this.insertNonFull(node.children[i], value);
-  }
-
   delete(value: T): void {
     if (!this.root) return;
-    this.deleteKey(this.root, value);
+    this.deleteRec(this.root, value);
     if (this.root.keys.length === 0) {
       this.root = this.root.leaf ? null : this.root.children[0];
     }
@@ -120,72 +133,47 @@ export class BTree<T> {
     return idx;
   }
 
-  private deleteKey(node: BTreeNode<T>, value: T): void {
-    const t = this.order;
-    const idx = this.findKeyIndex(node, value);
-
-    if (idx < node.keys.length && node.keys[idx] === value) {
-      if (node.leaf) {
-        node.keys.splice(idx, 1);
-      } else {
-        this.deleteFromInternal(node, idx);
-      }
-      return;
-    }
-
-    if (node.leaf) return; // value not present
-
-    const wasLastChild = idx === node.keys.length;
-    if (node.children[idx].keys.length < t) {
-      this.fill(node, idx);
-    }
-
-    // fill() may have merged the target child into its left sibling,
-    // shrinking node.keys - re-check where the target child ended up.
-    if (wasLastChild && idx > node.keys.length) {
-      this.deleteKey(node.children[idx - 1], value);
-    } else {
-      this.deleteKey(node.children[idx], value);
-    }
-  }
-
-  private deleteFromInternal(node: BTreeNode<T>, idx: number): void {
-    const t = this.order;
-    const key = node.keys[idx];
-
-    if (node.children[idx].keys.length >= t) {
-      const pred = this.getPredecessor(node, idx);
-      node.keys[idx] = pred;
-      this.deleteKey(node.children[idx], pred);
-    } else if (node.children[idx + 1].keys.length >= t) {
-      const succ = this.getSuccessor(node, idx);
-      node.keys[idx] = succ;
-      this.deleteKey(node.children[idx + 1], succ);
-    } else {
-      this.merge(node, idx);
-      this.deleteKey(node.children[idx], key);
-    }
-  }
-
   private getPredecessor(node: BTreeNode<T>, idx: number): T {
     let current = node.children[idx];
     while (!current.leaf) current = current.children[current.children.length - 1];
     return current.keys[current.keys.length - 1];
   }
 
-  private getSuccessor(node: BTreeNode<T>, idx: number): T {
-    let current = node.children[idx + 1];
-    while (!current.leaf) current = current.children[0];
-    return current.keys[0];
+  private deleteRec(node: BTreeNode<T>, value: T): void {
+    const idx = this.findKeyIndex(node, value);
+
+    if (idx < node.keys.length && node.keys[idx] === value) {
+      if (node.leaf) {
+        node.keys.splice(idx, 1);
+        return;
+      }
+
+      // Swap down to the predecessor leaf, then remove it from there -
+      // reduces an internal deletion to the already-handled leaf case.
+      const pred = this.getPredecessor(node, idx);
+      node.keys[idx] = pred;
+      this.deleteRec(node.children[idx], pred);
+      this.fixUnderflow(node, idx);
+      return;
+    }
+
+    if (node.leaf) return; // value not present
+
+    this.deleteRec(node.children[idx], value);
+    this.fixUnderflow(node, idx);
   }
 
-  private fill(node: BTreeNode<T>, idx: number): void {
-    const t = this.order;
-    if (idx !== 0 && node.children[idx - 1].keys.length >= t) {
+  // After deleting from node.children[idx], top it back off if it's now
+  // short - by borrowing a key from a sibling, or merging with one.
+  private fixUnderflow(node: BTreeNode<T>, idx: number): void {
+    const child = node.children[idx];
+    if (child.keys.length >= this.minKeys()) return;
+
+    if (idx > 0 && node.children[idx - 1].keys.length > this.minKeys()) {
       this.borrowFromPrev(node, idx);
-    } else if (idx !== node.children.length - 1 && node.children[idx + 1].keys.length >= t) {
+    } else if (idx < node.children.length - 1 && node.children[idx + 1].keys.length > this.minKeys()) {
       this.borrowFromNext(node, idx);
-    } else if (idx !== node.children.length - 1) {
+    } else if (idx < node.children.length - 1) {
       this.merge(node, idx);
     } else {
       this.merge(node, idx - 1);
@@ -214,6 +202,8 @@ export class BTree<T> {
     node.keys[idx] = sibling.keys.shift()!;
   }
 
+  // Merges node.children[idx] and node.children[idx+1], plus the
+  // separator key between them, into a single node.
   private merge(node: BTreeNode<T>, idx: number): void {
     const child = node.children[idx];
     const sibling = node.children[idx + 1];
