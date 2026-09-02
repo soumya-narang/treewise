@@ -4,10 +4,13 @@ import { BinarySearchTree } from './structures/BinarySearchTree';
 import { AVLTree } from './structures/AVLTree';
 import { HeapTree } from './structures/HeapTree';
 import { RedBlackTree } from './structures/RedBlackTree';
+import { BTree } from './structures/BTree';
 import { computeTreeLayout } from './layout/TreeLayout';
+import { computeBTreeLayout } from './layout/BTreeLayout';
 import { TreeCanvas } from './components/TreeCanvas';
+import { BTreeCanvas } from './components/BTreeCanvas';
 
-type TreeType = 'BST' | 'AVL' | 'MINHEAP' | 'MAXHEAP' | 'RBT';
+type TreeType = 'BST' | 'AVL' | 'MINHEAP' | 'MAXHEAP' | 'RBT' | 'BTREE';
 
 function App() {
   const [treeType, setTreeType] = useState<TreeType>('BST');
@@ -16,6 +19,7 @@ function App() {
   const [minHeap] = useState(new HeapTree<number>('MIN'));
   const [maxHeap] = useState(new HeapTree<number>('MAX'));
   const [rbt] = useState(new RedBlackTree<number>());
+  const [btree] = useState(new BTree<number>(2));
   
   // History state for undo/redo
   const [history, setHistory] = useState<{
@@ -24,7 +28,8 @@ function App() {
     minHeapRoot: typeof minHeap.root;
     maxHeapRoot: typeof maxHeap.root;
     rbtRoot: typeof rbt.root;
-  }[]>([{ bstRoot: null, avlRoot: null, minHeapRoot: null, maxHeapRoot: null, rbtRoot: null }]);
+    btreeRoot: typeof btree.root;
+  }[]>([{ bstRoot: null, avlRoot: null, minHeapRoot: null, maxHeapRoot: null, rbtRoot: null, btreeRoot: null }]);
   const [historyIndex, setHistoryIndex] = useState(0);
 
   // We use a counter just to force re-renders when the mutable tree changes
@@ -52,6 +57,7 @@ function App() {
         minHeapRoot: minHeap.root ? minHeap.root.clone() : null,
         maxHeapRoot: maxHeap.root ? maxHeap.root.clone() : null,
         rbtRoot: rbt.root ? rbt.root.clone() : null,
+        btreeRoot: btree.root ? btree.root.clone() : null,
       });
       setHistoryIndex(newHistory.length - 1);
       return newHistory;
@@ -68,6 +74,7 @@ function App() {
       minHeap.root = state.minHeapRoot ? state.minHeapRoot.clone() : null;
       maxHeap.root = state.maxHeapRoot ? state.maxHeapRoot.clone() : null;
       rbt.root = state.rbtRoot ? state.rbtRoot.clone() : null;
+      btree.root = state.btreeRoot ? state.btreeRoot.clone() : null;
       setSelectedNodeValues([]);
       setUpdateTick(prev => prev + 1);
       showToast('Undo');
@@ -84,6 +91,7 @@ function App() {
       minHeap.root = state.minHeapRoot ? state.minHeapRoot.clone() : null;
       maxHeap.root = state.maxHeapRoot ? state.maxHeapRoot.clone() : null;
       rbt.root = state.rbtRoot ? state.rbtRoot.clone() : null;
+      btree.root = state.btreeRoot ? state.btreeRoot.clone() : null;
       setSelectedNodeValues([]);
       setUpdateTick(prev => prev + 1);
       showToast('Redo');
@@ -117,6 +125,7 @@ function App() {
       case 'MINHEAP': inserted = minHeap.insert(val); break;
       case 'MAXHEAP': inserted = maxHeap.insert(val); break;
       case 'RBT': inserted = rbt.insert(val); break;
+      case 'BTREE': inserted = btree.insert(val); break;
     }
     if (!inserted) {
       showToast(`${val} already exists`);
@@ -139,6 +148,7 @@ function App() {
       case 'MINHEAP': minHeap.delete(val); break;
       case 'MAXHEAP': maxHeap.delete(val); break;
       case 'RBT': rbt.delete(val); break;
+      case 'BTREE': btree.delete(val); break;
     }
     
     setSelectedNodeValues([]);
@@ -170,6 +180,10 @@ function App() {
         rbt.root = null;
         vals.forEach(v => rbt.insert(v));
         break;
+      case 'BTREE':
+        btree.root = null;
+        vals.forEach(v => btree.insert(v));
+        break;
     }
     setSelectedNodeValues([]);
     saveState();
@@ -196,6 +210,7 @@ function App() {
       case 'MINHEAP': minHeap.root = null; break;
       case 'MAXHEAP': maxHeap.root = null; break;
       case 'RBT': rbt.root = null; break;
+      case 'BTREE': btree.root = null; break;
     }
     setSelectedNodeValues([]);
     saveState();
@@ -220,9 +235,12 @@ function App() {
     treeType === 'AVL' ? avl.root :
     treeType === 'MINHEAP' ? minHeap.root :
     treeType === 'MAXHEAP' ? maxHeap.root :
-    rbt.root;
+    treeType === 'RBT' ? rbt.root : null;
   const layout = computeTreeLayout(currentRoot, canvasWidth, 80);
-  const canvasHeight = Math.max(600, (layout.nodes.length > 0 ? Math.max(...layout.nodes.map(n => n.y)) : 0) + 120);
+  const btreeLayout = computeBTreeLayout(treeType === 'BTREE' ? btree.root : null, canvasWidth, 90);
+  const canvasHeight = treeType === 'BTREE'
+    ? Math.max(600, (btreeLayout.nodes.length > 0 ? Math.max(...btreeLayout.nodes.map(n => n.y)) : 0) + 120)
+    : Math.max(600, (layout.nodes.length > 0 ? Math.max(...layout.nodes.map(n => n.y)) : 0) + 120);
 
   const chainType = treeType === 'BST' && selectedNodeValues.length === 3 ? bst.getChainType(selectedNodeValues) : null;
 
@@ -288,6 +306,12 @@ function App() {
             >
               Red-Black
             </button>
+            <button 
+              className={treeType === 'BTREE' ? 'active' : ''} 
+              onClick={() => { setTreeType('BTREE'); setSelectedNodeValues([]); setUpdateTick(t=>t+1); }}
+            >
+              B-Tree
+            </button>
           </div>
           <div className="big-o-caption">
             {treeType === 'BST' && 'avg O(log n) lookup · worst O(n) if it grows lopsided'}
@@ -295,6 +319,7 @@ function App() {
             {treeType === 'MINHEAP' && 'complete tree · root is always the minimum · O(log n) insert/delete'}
             {treeType === 'MAXHEAP' && 'complete tree · root is always the maximum · O(log n) insert/delete'}
             {treeType === 'RBT' && 'guaranteed O(log n) height · balances via node color, not strict height'}
+            {treeType === 'BTREE' && 'wide, shallow nodes · each holds up to 3 keys · O(log n) height'}
           </div>
         </div>
 
@@ -374,13 +399,23 @@ function App() {
       </div>
 
       <div className="canvas-container" ref={containerRef}>
-        <TreeCanvas 
-          layout={layout} 
-          width={canvasWidth} 
-          height={canvasHeight}
-          onNodeClick={handleNodeClick}
-          selectedNodeValues={selectedNodeValues}
-        />
+        {treeType === 'BTREE' ? (
+          <BTreeCanvas
+            layout={btreeLayout}
+            width={canvasWidth}
+            height={canvasHeight}
+            onKeyClick={handleNodeClick}
+            selectedValues={selectedNodeValues}
+          />
+        ) : (
+          <TreeCanvas 
+            layout={layout} 
+            width={canvasWidth} 
+            height={canvasHeight}
+            onNodeClick={handleNodeClick}
+            selectedNodeValues={selectedNodeValues}
+          />
+        )}
       </div>
     </div>
   );
