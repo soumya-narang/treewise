@@ -20,6 +20,12 @@ function App() {
   const [maxHeap] = useState(new HeapTree<number>('MAX'));
   const [rbt] = useState(new RedBlackTree<number>());
   const [btree] = useState(new BTree<number>(2));
+  // A B-Tree's order is a structural choice fixed before any insertion -
+  // changing it later means rebuilding the tree from scratch - so the UI
+  // requires it to be set explicitly at least once before Insert/Randomize
+  // are enabled for this tree type.
+  const [btreeOrderConfirmed, setBtreeOrderConfirmed] = useState(false);
+  const [btreeOrderInput, setBtreeOrderInput] = useState('2');
   
   // History state for undo/redo
   const [history, setHistory] = useState<{
@@ -29,7 +35,8 @@ function App() {
     maxHeapRoot: typeof maxHeap.root;
     rbtRoot: typeof rbt.root;
     btreeRoot: typeof btree.root;
-  }[]>([{ bstRoot: null, avlRoot: null, minHeapRoot: null, maxHeapRoot: null, rbtRoot: null, btreeRoot: null }]);
+    btreeOrder: number;
+  }[]>([{ bstRoot: null, avlRoot: null, minHeapRoot: null, maxHeapRoot: null, rbtRoot: null, btreeRoot: null, btreeOrder: btree.order }]);
   const [historyIndex, setHistoryIndex] = useState(0);
 
   // We use a counter just to force re-renders when the mutable tree changes
@@ -58,6 +65,7 @@ function App() {
         maxHeapRoot: maxHeap.root ? maxHeap.root.clone() : null,
         rbtRoot: rbt.root ? rbt.root.clone() : null,
         btreeRoot: btree.root ? btree.root.clone() : null,
+        btreeOrder: btree.order,
       });
       setHistoryIndex(newHistory.length - 1);
       return newHistory;
@@ -74,6 +82,7 @@ function App() {
       minHeap.root = state.minHeapRoot ? state.minHeapRoot.clone() : null;
       maxHeap.root = state.maxHeapRoot ? state.maxHeapRoot.clone() : null;
       rbt.root = state.rbtRoot ? state.rbtRoot.clone() : null;
+      btree.order = state.btreeOrder;
       btree.root = state.btreeRoot ? state.btreeRoot.clone() : null;
       setSelectedNodeValues([]);
       setUpdateTick(prev => prev + 1);
@@ -91,6 +100,7 @@ function App() {
       minHeap.root = state.minHeapRoot ? state.minHeapRoot.clone() : null;
       maxHeap.root = state.maxHeapRoot ? state.maxHeapRoot.clone() : null;
       rbt.root = state.rbtRoot ? state.rbtRoot.clone() : null;
+      btree.order = state.btreeOrder;
       btree.root = state.btreeRoot ? state.btreeRoot.clone() : null;
       setSelectedNodeValues([]);
       setUpdateTick(prev => prev + 1);
@@ -115,6 +125,10 @@ function App() {
 
   const handleInsert = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+    if (treeType === 'BTREE' && !btreeOrderConfirmed) {
+      showToast('Set the B-Tree order first');
+      return;
+    }
     const val = parseInt(inputValue, 10);
     if (isNaN(val)) return;
 
@@ -158,6 +172,10 @@ function App() {
   };
   
   const handleRandomize = () => {
+    if (treeType === 'BTREE' && !btreeOrderConfirmed) {
+      showToast('Set the B-Tree order first');
+      return;
+    }
     const vals = Array.from({length: 7}, () => Math.floor(Math.random() * 100));
     switch (treeType) {
       case 'BST':
@@ -216,6 +234,22 @@ function App() {
     saveState();
     setUpdateTick(prev => prev + 1);
     showToast('Cleared canvas');
+  };
+
+  const handleSetBtreeOrder = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const order = parseInt(btreeOrderInput, 10);
+    if (isNaN(order) || order < 2) {
+      showToast('Order must be a whole number ≥ 2');
+      return;
+    }
+    btree.order = order;
+    btree.root = null;
+    setBtreeOrderConfirmed(true);
+    setSelectedNodeValues([]);
+    saveState();
+    setUpdateTick(prev => prev + 1);
+    showToast(`B-Tree order set to ${order}`);
   };
   
   const handleAdvancedRotate = (type: 'LL' | 'RR' | 'LR' | 'RL') => {
@@ -319,9 +353,57 @@ function App() {
             {treeType === 'MINHEAP' && 'complete tree · root is always the minimum · O(log n) insert/delete'}
             {treeType === 'MAXHEAP' && 'complete tree · root is always the maximum · O(log n) insert/delete'}
             {treeType === 'RBT' && 'guaranteed O(log n) height · balances via node color, not strict height'}
-            {treeType === 'BTREE' && 'wide, shallow nodes · each holds up to 3 keys · O(log n) height'}
+            {treeType === 'BTREE' && `order t = ${btree.order} · each node holds ${btree.order - 1}-${2 * btree.order - 1} keys · O(log n) height`}
           </div>
         </div>
+
+        {treeType === 'BTREE' && (
+          <div className="controls-group">
+            <div className="section-header">B-TREE ORDER</div>
+            {!btreeOrderConfirmed ? (
+              <>
+                <p style={{ fontFamily: 'IBM Plex Sans', fontSize: '13px', color: 'var(--text-main)' }}>
+                  Required before inserting: pick the minimum degree (t). Every node will hold t-1 to 2t-1 keys.
+                </p>
+                <form className="input-row" onSubmit={handleSetBtreeOrder}>
+                  <input 
+                    type="number" 
+                    min={2}
+                    placeholder="t ≥ 2"
+                    value={btreeOrderInput}
+                    onChange={e => setBtreeOrderInput(e.target.value)}
+                  />
+                  <button type="submit" className="btn">Set Order</button>
+                </form>
+              </>
+            ) : btree.root === null ? (
+              <>
+                <p style={{ fontFamily: 'IBM Plex Mono', fontSize: '13px', color: 'var(--primary-color)', fontWeight: 600 }}>
+                  t = {btree.order} (max {2 * btree.order - 1} keys/node)
+                </p>
+                <form className="input-row" onSubmit={handleSetBtreeOrder}>
+                  <input 
+                    type="number" 
+                    min={2}
+                    placeholder="New order..." 
+                    value={btreeOrderInput}
+                    onChange={e => setBtreeOrderInput(e.target.value)}
+                  />
+                  <button type="submit" className="btn btn-secondary">Change</button>
+                </form>
+              </>
+            ) : (
+              <>
+                <p style={{ fontFamily: 'IBM Plex Mono', fontSize: '13px', color: 'var(--primary-color)', fontWeight: 600 }}>
+                  t = {btree.order} (max {2 * btree.order - 1} keys/node)
+                </p>
+                <p style={{ fontFamily: 'IBM Plex Sans', fontSize: '12px', color: 'var(--text-muted)' }}>
+                  Clear the canvas to pick a different order.
+                </p>
+              </>
+            )}
+          </div>
+        )}
 
         <div className="controls-group">
           <div className="section-header">OPERATIONS</div>
@@ -332,7 +414,7 @@ function App() {
               value={inputValue}
               onChange={e => setInputValue(e.target.value)}
             />
-            <button type="submit" className="btn">Insert</button>
+            <button type="submit" className="btn" disabled={treeType === 'BTREE' && !btreeOrderConfirmed}>Insert</button>
           </form>
           <button className="btn btn-danger" onClick={handleDelete} disabled={selectedNodeValues.length !== 1}>
             Delete Selected Node
@@ -383,7 +465,12 @@ function App() {
         )}
 
         <div className="controls-group" style={{ marginTop: 'auto' }}>
-           <button className="btn btn-secondary" onClick={handleRandomize} style={{ marginBottom: '8px', width: '100%' }}>
+           <button 
+             className="btn btn-secondary" 
+             onClick={handleRandomize} 
+             disabled={treeType === 'BTREE' && !btreeOrderConfirmed}
+             style={{ marginBottom: '8px', width: '100%' }}
+           >
              Generate Random Tree
            </button>
            <button className="btn btn-secondary" onClick={handleClear} style={{ width: '100%' }}>

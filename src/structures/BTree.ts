@@ -15,14 +15,19 @@ import { BTreeNode } from './BTreeNode';
  */
 export class BTree<T> {
   root: BTreeNode<T> | null = null;
-  private readonly t: number;
+  // The minimum degree (commonly called the tree's "order"). Public and
+  // mutable because it's a fixed choice made before any insertion - the UI
+  // sets it once up front, and changing it always goes hand in hand with
+  // clearing `root`, since an existing tree's shape is only valid under the
+  // order it was built with.
+  order: number;
 
-  constructor(t: number = 2) {
-    this.t = t;
+  constructor(order: number = 2) {
+    this.order = order;
   }
 
   private maxKeys(): number {
-    return 2 * this.t - 1;
+    return 2 * this.order - 1;
   }
 
   contains(value: T): boolean {
@@ -63,7 +68,7 @@ export class BTree<T> {
   }
 
   private splitChild(parent: BTreeNode<T>, index: number): void {
-    const t = this.t;
+    const t = this.order;
     const fullChild = parent.children[index];
     const newChild = new BTreeNode<T>();
     newChild.leaf = fullChild.leaf;
@@ -116,7 +121,7 @@ export class BTree<T> {
   }
 
   private deleteKey(node: BTreeNode<T>, value: T): void {
-    const t = this.t;
+    const t = this.order;
     const idx = this.findKeyIndex(node, value);
 
     if (idx < node.keys.length && node.keys[idx] === value) {
@@ -145,7 +150,7 @@ export class BTree<T> {
   }
 
   private deleteFromInternal(node: BTreeNode<T>, idx: number): void {
-    const t = this.t;
+    const t = this.order;
     const key = node.keys[idx];
 
     if (node.children[idx].keys.length >= t) {
@@ -175,7 +180,7 @@ export class BTree<T> {
   }
 
   private fill(node: BTreeNode<T>, idx: number): void {
-    const t = this.t;
+    const t = this.order;
     if (idx !== 0 && node.children[idx - 1].keys.length >= t) {
       this.borrowFromPrev(node, idx);
     } else if (idx !== node.children.length - 1 && node.children[idx + 1].keys.length >= t) {
