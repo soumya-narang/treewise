@@ -37,8 +37,17 @@ export class AVLTree<T> {
     return y;
   }
 
-  insert(value: T): void {
+  private contains(node: TreeNode<T> | null, value: T): boolean {
+    if (!node) return false;
+    if (value === node.value) return true;
+    return value < node.value ? this.contains(node.left, value) : this.contains(node.right, value);
+  }
+
+  /** Returns true if the value was inserted, false if it was already present. */
+  insert(value: T): boolean {
+    if (this.contains(this.root, value)) return false;
     this.root = this.insertNode(this.root, value);
+    return true;
   }
 
   private insertNode(node: TreeNode<T> | null, value: T): TreeNode<T> {

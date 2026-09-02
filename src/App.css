@@ -138,12 +138,12 @@
 }
 
 .tree-selector {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   border: 1px solid var(--border-strong);
 }
 
 .tree-selector button {
-  flex: 1;
   padding: 8px;
   font-family: 'IBM Plex Mono', monospace;
   font-size: 13px;
@@ -151,7 +151,17 @@
   color: var(--text-soft);
   background-color: var(--panel-bg);
   border: none;
+  border-right: 1px solid var(--border-strong);
+  border-bottom: 1px solid var(--border-strong);
   cursor: pointer;
+}
+
+.tree-selector button:nth-child(2n) {
+  border-right: none;
+}
+
+.tree-selector button:nth-last-child(-n+2) {
+  border-bottom: none;
 }
 
 .tree-selector button.active {

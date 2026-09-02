@@ -3,11 +3,12 @@ import { TreeNode } from './TreeNode';
 export class BinarySearchTree<T> {
   root: TreeNode<T> | null = null;
 
-  insert(value: T): void {
+  /** Returns true if the value was inserted, false if it was already present. */
+  insert(value: T): boolean {
     const newNode = new TreeNode(value);
     if (!this.root) {
       this.root = newNode;
-      return;
+      return true;
     }
 
     let current = this.root;
@@ -15,18 +16,18 @@ export class BinarySearchTree<T> {
       if (value < current.value) {
         if (current.left === null) {
           current.left = newNode;
-          return;
+          return true;
         }
         current = current.left;
       } else if (value > current.value) {
         if (current.right === null) {
           current.right = newNode;
-          return;
+          return true;
         }
         current = current.right;
       } else {
         // Value already exists (ignore duplicates for simplicity)
-        return;
+        return false;
       }
     }
   }

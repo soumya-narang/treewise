@@ -2,18 +2,26 @@ import { useState, useEffect, useRef } from 'react';
 import './App.css';
 import { BinarySearchTree } from './structures/BinarySearchTree';
 import { AVLTree } from './structures/AVLTree';
+import { HeapTree } from './structures/HeapTree';
 import { computeTreeLayout } from './layout/TreeLayout';
 import { TreeCanvas } from './components/TreeCanvas';
 
-type TreeType = 'BST' | 'AVL';
+type TreeType = 'BST' | 'AVL' | 'MINHEAP' | 'MAXHEAP';
 
 function App() {
   const [treeType, setTreeType] = useState<TreeType>('BST');
   const [bst] = useState(new BinarySearchTree<number>());
   const [avl] = useState(new AVLTree<number>());
+  const [minHeap] = useState(new HeapTree<number>('MIN'));
+  const [maxHeap] = useState(new HeapTree<number>('MAX'));
   
   // History state for undo/redo
-  const [history, setHistory] = useState<{bstRoot: typeof bst.root, avlRoot: typeof avl.root}[]>([{ bstRoot: null, avlRoot: null }]);
+  const [history, setHistory] = useState<{
+    bstRoot: typeof bst.root;
+    avlRoot: typeof avl.root;
+    minHeapRoot: typeof minHeap.root;
+    maxHeapRoot: typeof maxHeap.root;
+  }[]>([{ bstRoot: null, avlRoot: null, minHeapRoot: null, maxHeapRoot: null }]);
   const [historyIndex, setHistoryIndex] = useState(0);
 
   // We use a counter just to force re-renders when the mutable tree changes
@@ -38,6 +46,8 @@ function App() {
       newHistory.push({
         bstRoot: bst.root ? bst.root.clone() : null,
         avlRoot: avl.root ? avl.root.clone() : null,
+        minHeapRoot: minHeap.root ? minHeap.root.clone() : null,
+        maxHeapRoot: maxHeap.root ? maxHeap.root.clone() : null,
       });
       setHistoryIndex(newHistory.length - 1);
       return newHistory;
@@ -51,6 +61,8 @@ function App() {
       const state = history[newIndex];
       bst.root = state.bstRoot ? state.bstRoot.clone() : null;
       avl.root = state.avlRoot ? state.avlRoot.clone() : null;
+      minHeap.root = state.minHeapRoot ? state.minHeapRoot.clone() : null;
+      maxHeap.root = state.maxHeapRoot ? state.maxHeapRoot.clone() : null;
       setSelectedNodeValues([]);
       setUpdateTick(prev => prev + 1);
       showToast('Undo');
@@ -64,6 +76,8 @@ function App() {
       const state = history[newIndex];
       bst.root = state.bstRoot ? state.bstRoot.clone() : null;
       avl.root = state.avlRoot ? state.avlRoot.clone() : null;
+      minHeap.root = state.minHeapRoot ? state.minHeapRoot.clone() : null;
+      maxHeap.root = state.maxHeapRoot ? state.maxHeapRoot.clone() : null;
       setSelectedNodeValues([]);
       setUpdateTick(prev => prev + 1);
       showToast('Redo');
@@ -90,10 +104,16 @@ function App() {
     const val = parseInt(inputValue, 10);
     if (isNaN(val)) return;
 
-    if (treeType === 'BST') {
-      bst.insert(val);
-    } else {
-      avl.insert(val);
+    let inserted: boolean;
+    switch (treeType) {
+      case 'BST': inserted = bst.insert(val); break;
+      case 'AVL': inserted = avl.insert(val); break;
+      case 'MINHEAP': inserted = minHeap.insert(val); break;
+      case 'MAXHEAP': inserted = maxHeap.insert(val); break;
+    }
+    if (!inserted) {
+      showToast(`${val} already exists`);
+      return;
     }
     
     saveState();
@@ -106,10 +126,11 @@ function App() {
     if (selectedNodeValues.length !== 1) return;
     const val = selectedNodeValues[0];
 
-    if (treeType === 'BST') {
-      bst.delete(val);
-    } else {
-      avl.delete(val);
+    switch (treeType) {
+      case 'BST': bst.delete(val); break;
+      case 'AVL': avl.delete(val); break;
+      case 'MINHEAP': minHeap.delete(val); break;
+      case 'MAXHEAP': maxHeap.delete(val); break;
     }
     
     setSelectedNodeValues([]);
@@ -120,12 +141,23 @@ function App() {
   
   const handleRandomize = () => {
     const vals = Array.from({length: 7}, () => Math.floor(Math.random() * 100));
-    if (treeType === 'BST') {
-      bst.root = null;
-      vals.forEach(v => bst.insert(v));
-    } else {
-      avl.root = null;
-      vals.forEach(v => avl.insert(v));
+    switch (treeType) {
+      case 'BST':
+        bst.root = null;
+        vals.forEach(v => bst.insert(v));
+        break;
+      case 'AVL':
+        avl.root = null;
+        vals.forEach(v => avl.insert(v));
+        break;
+      case 'MINHEAP':
+        minHeap.root = null;
+        vals.forEach(v => minHeap.insert(v));
+        break;
+      case 'MAXHEAP':
+        maxHeap.root = null;
+        vals.forEach(v => maxHeap.insert(v));
+        break;
     }
     setSelectedNodeValues([]);
     saveState();
@@ -146,8 +178,12 @@ function App() {
   };
 
   const handleClear = () => {
-    if (treeType === 'BST') bst.root = null;
-    else avl.root = null;
+    switch (treeType) {
+      case 'BST': bst.root = null; break;
+      case 'AVL': avl.root = null; break;
+      case 'MINHEAP': minHeap.root = null; break;
+      case 'MAXHEAP': maxHeap.root = null; break;
+    }
     setSelectedNodeValues([]);
     saveState();
     setUpdateTick(prev => prev + 1);
@@ -166,7 +202,11 @@ function App() {
     }
   };
 
-  const currentRoot = treeType === 'BST' ? bst.root : avl.root;
+  const currentRoot =
+    treeType === 'BST' ? bst.root :
+    treeType === 'AVL' ? avl.root :
+    treeType === 'MINHEAP' ? minHeap.root :
+    maxHeap.root;
   const layout = computeTreeLayout(currentRoot, canvasWidth, 80);
   const canvasHeight = Math.max(600, (layout.nodes.length > 0 ? Math.max(...layout.nodes.map(n => n.y)) : 0) + 120);
 
@@ -216,11 +256,24 @@ function App() {
             >
               AVL (Balanced)
             </button>
+            <button 
+              className={treeType === 'MINHEAP' ? 'active' : ''} 
+              onClick={() => { setTreeType('MINHEAP'); setSelectedNodeValues([]); setUpdateTick(t=>t+1); }}
+            >
+              Min Heap
+            </button>
+            <button 
+              className={treeType === 'MAXHEAP' ? 'active' : ''} 
+              onClick={() => { setTreeType('MAXHEAP'); setSelectedNodeValues([]); setUpdateTick(t=>t+1); }}
+            >
+              Max Heap
+            </button>
           </div>
           <div className="big-o-caption">
-            {treeType === 'BST' 
-              ? 'avg O(log n) lookup · worst O(n) if it grows lopsided' 
-              : 'guaranteed O(log n) height · rebalances on every write'}
+            {treeType === 'BST' && 'avg O(log n) lookup · worst O(n) if it grows lopsided'}
+            {treeType === 'AVL' && 'guaranteed O(log n) height · rebalances on every write'}
+            {treeType === 'MINHEAP' && 'complete tree · root is always the minimum · O(log n) insert/delete'}
+            {treeType === 'MAXHEAP' && 'complete tree · root is always the maximum · O(log n) insert/delete'}
           </div>
         </div>
 
