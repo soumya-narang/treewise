@@ -477,12 +477,6 @@ function App() {
              Clear Canvas
            </button>
         </div>
-
-        {toastMessage && (
-          <div className="toast" key={toastId}>
-            {toastMessage}
-          </div>
-        )}
       </div>
 
       <div className="canvas-container" ref={containerRef}>
@@ -504,6 +498,12 @@ function App() {
           />
         )}
       </div>
+
+      {toastMessage && (
+        <div className="toast" key={toastId}>
+          {toastMessage}
+        </div>
+      )}
     </div>
   );
 }
